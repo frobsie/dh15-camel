@@ -15,9 +15,7 @@ import org.apache.log4j.Logger;
 public class FeedConvertBean
 {
     final static Logger logger = Logger.getLogger(FeedConvertBean.class);
-
-    private List<Map<String, Object>> feedItems = new ArrayList<Map<String,Object>>();
-
+    
     /**
      * Verwerkt het SyndFeed object wat teruggegegven wordt
      * uit de camel-rss module tot een object wat de datasource

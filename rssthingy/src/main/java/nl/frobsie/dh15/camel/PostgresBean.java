@@ -7,15 +7,27 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import org.apache.commons.dbcp.*;
 
+import org.apache.log4j.Logger;
+
 /**
  * TODO
  * Dit ding kan echt zo veel beter
  */
 public class PostgresBean
 {
+    /** Het DataSource object */
     private BasicDataSource dataSource;
 
+    /** Logger */
+    final static Logger logger = Logger.getLogger(PostgresBean.class);
+
+    /**
+     * Constructor
+     * @return void
+     */
     public PostgresBean() {
+        // TODO
+        // gegevens richting properties file
         dataSource = new BasicDataSource();
         dataSource.setDriverClassName("org.postgresql.Driver");
         dataSource.setUsername("postgres");
@@ -26,14 +38,26 @@ public class PostgresBean
         resetSequence();
     }
 
+    /**
+     * Voert een truncate cmd uit op
+     * de feedentry tabel
+     */
     protected void truncate() {
         doQuery("TRUNCATE TABLE feedentry");
     }
 
+    /**
+     * Reset de sequence zodat autoincrementen
+     * weer vanaf 1 begint.
+     */
     protected void resetSequence() {
         doQuery("ALTER SEQUENCE feedentry_id_seq RESTART");
     }
 
+    /**
+     * Handmatig query uitvoeren
+     * @param String sql
+     */
     protected void doQuery(String sql) {
         Connection con;
         PreparedStatement pstmt;
@@ -48,10 +72,19 @@ public class PostgresBean
         }
     }
 
+    /**
+     * Geeft het DataSource object terug.
+     * @return [description]
+     */
     public DataSource getDataSource() {
        return dataSource;
     }
 
+    /**
+     * Zet het DataSource object.
+     * 
+     * @param BasicDataSource dataSource
+     */
     public void setDataSource(BasicDataSource dataSource) {
         this.dataSource = dataSource;
     }
