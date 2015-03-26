@@ -43,7 +43,7 @@ public class PostgresBean
      * de feedentry tabel
      */
     protected void truncate() {
-        doQuery("TRUNCATE TABLE feedentry");
+        doQuery("TRUNCATE TABLE feedentryqueue");
     }
 
     /**
@@ -51,7 +51,7 @@ public class PostgresBean
      * weer vanaf 1 begint.
      */
     protected void resetSequence() {
-        doQuery("ALTER SEQUENCE feedentry_id_seq RESTART");
+        doQuery("ALTER SEQUENCE feedentryqueue_id_seq RESTART");
     }
 
     /**
