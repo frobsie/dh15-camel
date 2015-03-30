@@ -7,8 +7,20 @@ import org.apache.camel.impl.SimpleRegistry;
 
 import nl.frobsie.dh15.camel.PostgresBean;
 import nl.frobsie.dh15.camel.FeedBean;
+import nl.frobsie.dh15.camel.FeedEntry;
 
 public class RSSThingy {
+
+    public static String URL_RSS = "http://phys.org/rss-feed/space-news/astronomy/";
+    public static String FILE_RSS = "src/main/resources/feed.xml";
+
+    public static String SQL_INSERT = "insert into public.feedentryqueue (title, link, description, pubdate) values (:#title, :#link, :#description, :#pubdate)";
+    //public static String SQL_GET = "select * from feedentryqueue where processed=false";
+    public static String SQL_GET_PROCESSED = "select id, title, link, description, pubdate, processed, externalid from feedentryqueue where processed=true";
+    public static String SQL_GET_MAIL = "select * from email";
+    public static String SQL_PROCESS = "update feedentryqueue set processed = true, externalid = :#externalid where id = :#id";
+
+    public static String MSG_MAIL = "Email versturen?";
 
     public static void main(String args[]) throws Exception {
 
@@ -28,13 +40,14 @@ public class RSSThingy {
         context.addRoutes(new RouteBuilder() {
             public void configure() {
 
-                String rssUrl = "http://phys.org/rss-feed/space-news/astronomy/";
-
-                String sqlInsertQueue = "insert into public.feedentryqueue (title, link, description, pubdate) values (:#title, :#link, :#description, :#pubdate)";
-
-                String sqlGet = "select * from feedentryqueue where processed=false";
-
-                String sqlProcess = "update feedentryqueue set processed = true, externalid = :#externalid where id = :#id";
+                /*
+                 * EIP's :
+                 * - Pipes and Filters
+                 * - Multicast
+                 *
+                 * TODO
+                 * recipient list
+                 */
 
                 /**
                  * Route 1
@@ -43,18 +56,42 @@ public class RSSThingy {
                  * uitgevoerd wordt, omdat we de daadwerkelijke ROME SyncFeed objecten
                  * willen hebben en niet de XML als string.
                  */
-                from("rss:" + rssUrl + "?splitEntries=true&consumer.delay=100").
+                from("rss:file:" + FILE_RSS + "?splitEntries=true&consumer.delay=100"). // LOKAAL VANWEGE GARE VERBINDING
+                //from("rss:" + URL_RSS + "?splitEntries=true&consumer.delay=250").
                     to("bean:feedBean?method=convert").
-                    to("sql:" + sqlInsertQueue + "?dataSource=postgres");
+                    multicast().
+                    to("direct:insert", "direct:unprocessed");
 
                 /**
                  * Route 2
+                 * Insert de zojuist geconverteerde items
+                 * in de database.
+                 */
+                from("direct:insert").
+                    to("sql:" + SQL_INSERT + "?dataSource=postgres");
+
+                /**
+                 * Route 3
                  * Verwerkt elk record in de feedentryqueue tabel 
                  * zodat het externalid (a.d.h.v. de link) gevuld wordt.
                  */
-                from("sql:" + sqlGet + "?dataSource=postgres").
+                from("direct:unprocessed").
                     to("bean:feedBean?method=processEntry").
-                    to("sql:" + sqlProcess + "?dataSource=postgres");
+                    to("sql:" + SQL_PROCESS + "?dataSource=postgres");
+
+                /**
+                 * Route 4
+                 * Converteer de processed results in de database
+                 * naar een XML bestand. Leg daar een XSL bestand overheen voor
+                 * styling en verstuur het naar alle emailadresssen die
+                 * in de database bekend zijn.
+                 */
+                // from("sql:" + SQL_GET_PROCESSED + "?dataSource=postgres&outputClass=nl.frobsie.dh15.camel.FeedEntry").
+                //     //convertBodyTo(String.class).
+                //     to("xslt:file:src/main/resources/template.xsl");
+                    //to("stream:out");
+                    //.to("smtps://<google user name>@smtp.gmail.com?password=<passwd>&to=<email address>&from=camellover@gmail.com");
+
             }
         });
 

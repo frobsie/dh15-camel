@@ -1,4 +1,4 @@
-CREATE TABLE feedentryqueue
+CREATE TABLE public.feedentryqueue
 (
   id serial NOT NULL,
   title character varying(255),
@@ -8,4 +8,11 @@ CREATE TABLE feedentryqueue
   processed boolean DEFAULT false,
   externalid character varying(255) DEFAULT NULL,
   CONSTRAINT feedentryqueue_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE public.email
+(
+  id serial NOT NULL,
+  address character varying,
+  CONSTRAINT email_pkey PRIMARY KEY (id)
 );
