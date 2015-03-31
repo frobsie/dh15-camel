@@ -18,7 +18,9 @@ public class RSSThingy {
 
     /** RSS */
     public static String URL_RSS = "http://phys.org/rss-feed/space-news/astronomy/";
-    public static String FILE_RSS = "src/main/resources/feed.xml";
+    public static String FILE_MAIL = "mail.eml";
+    public static String FILE_RSS = "feed.xml";
+    public static String FILE_RSS_PATH = "tmp";
     public static String FILE_XSL = "src/main/resources/template.xsl";
 
     /** Queries */
@@ -53,20 +55,30 @@ public class RSSThingy {
                  * - Message Translator (beans -> geen afhankelijkheid camel)
                  * - Multicast
                  */
-
+                
+                RSSThingy.validateGmail();
+                
                 /**
                  * Route 1
+                 * Sla de feed in zijn geheel op in de tmp folder.
+                 * Let op : Deze wordt steeds overschreven.
+                 */
+                from("rss:" + URL_RSS + "?splitEntries=false").
+                    marshal().rss().
+                    to("file:" + FILE_RSS_PATH + "?fileName=" + FILE_RSS);
+
+                /**
+                 * Route 2
                  * Haalt de feed per aanwezig item op van opgegeven url. 
                  * Let op dat hier niet marshal().rss() uitgevoerd wordt, 
                  * omdat we de daadwerkelijke ROME SyncFeed objecten
                  * willen hebben en niet de XML als string.
                  */
-                from("rss:file:" + FILE_RSS + "?splitEntries=true&consumer.delay=100"). // LOKAAL VANWEGE GARE VERBINDING
-                //from("rss:" + URL_RSS + "?splitEntries=true&consumer.delay=250").
+                from("rss:file:" + FILE_RSS_PATH + "/" + FILE_RSS + "?splitEntries=true&consumer.delay=100").
                     to("direct:rssResults");
 
                 /**
-                 * Route 2
+                 * Route 3
                  * Converteren van de rss results naar een format
                  * wat de SQL component snapt en deze inserten.
                  */
@@ -75,7 +87,7 @@ public class RSSThingy {
                     to("sql:" + SQL_INSERT + "?dataSource=jdbc/postgres");
 
                 /**
-                 * Route 3
+                 * Route 4
                  * Verwerkt elk record in de feedentryqueue tabel 
                  * zodat het externalid (a.d.h.v. de link) gevuld wordt.
                  */
@@ -85,38 +97,36 @@ public class RSSThingy {
                         to("direct:updateProcessed", "direct:updateExternalId");
                     
                 /**
-                 * Route 4
+                 * Route 5
                  * Update processed boolean in database.
                  */
                 from("direct:updateProcessed").
                     to("sql:" + SQL_UPDATE_PROCESSED + "?dataSource=jdbc/postgres");
 
                 /**
-                 * Route 5
+                 * Route 6
                  * Update externalid in database.
                  */
                 from("direct:updateExternalId").
                     to("sql:" + SQL_UPDATE_EXTERNALID + "?dataSource=jdbc/postgres");
 
-                // TODO 
-                // kopieerslag van queue tabel naar iets anders
-                // zodat het niet compleet nutteloos is ;-)
-
                 /**
-                 * Route 5
-                 * Converteer de processed results in de database
-                 * naar een XML bestand. Leg daar een XSL bestand overheen voor
-                 * styling en verstuur het naar alle emailadresssen die
-                 * in de database bekend zijn.
+                 * Route 7
+                 * Laadt de feed opnieuw in, maar dit maal in zijn geheel.
+                 * Op deze manier kan er een XSL stylesheet overheen gehaald 
+                 * worden ter voorbereiding op het mailen. Ook wordt
+                 * de html voor het mailtje klaargezet in een bestand (ter controle).
                  */
-                from("rss:file:" + FILE_RSS + "?splitEntries=false").
+                from("rss:file:" + FILE_RSS_PATH + "/" + FILE_RSS + "?splitEntries=false").
                     marshal().rss().
                     to("xslt:file:" + FILE_XSL).
                     to("log:nl.frobsie.dh15.camel.RSSThingy").
+                    to("file:" + FILE_RSS_PATH + "?fileName=" + FILE_MAIL).
                     to("direct:xsltResult");
+                    
 
                 /**
-                 * Route 6
+                 * Route 8
                  * Mail de geconverteerde rssresults
                  */
                 from("direct:xsltResult").
@@ -128,5 +138,16 @@ public class RSSThingy {
         context.start();
         Thread.sleep(10000);
         context.stop();
+    }
+
+    /**
+     *  Controleer of GMail gegevens ingevuld zijn
+     *  
+     * @throws RuntimeException
+     */
+    public static void validateGmail() throws RuntimeException {
+        if (GMAIL_FROM.equals("") || GMAIL_TO.equals("") || GMAIL_USER.equals("") || GMAIL_PASSWORD.equals("")) {
+            throw new RuntimeException("Gmail gegevens niet (volledig) ingevuld!");
+        }
     }
 }

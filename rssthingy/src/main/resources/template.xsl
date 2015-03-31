@@ -13,7 +13,10 @@
                   <xsl:for-each select="channel/item">
                      <tr>
                         <td>
-                           <a href="">
+                           <a>
+                              <xsl:attribute name="href">
+                                <xsl:value-of select="link" />
+                              </xsl:attribute>
                               <xsl:value-of select="title" />
                            </a>
                         </td>
