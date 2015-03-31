@@ -1,3 +1,5 @@
+Gmail STMP statics wijzigen in RSSThhingy.java
+
 Gegevens van database aanpassen in PostgresBean :
 ```sh
 dataSource.setDriverClassName("org.postgresql.Driver");

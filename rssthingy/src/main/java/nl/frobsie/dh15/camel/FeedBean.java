@@ -79,6 +79,7 @@ public class FeedBean
         updateEntry.put("id", feedEntry.get("id"));
         updateEntry.put("processed", processed);
         updateEntry.put("externalid", externalId);
+
         return updateEntry;
     }
 }

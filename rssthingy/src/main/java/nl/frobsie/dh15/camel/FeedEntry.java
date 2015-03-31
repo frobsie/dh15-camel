@@ -5,7 +5,12 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlElementWrapper;
 
+// TODO
+// kijken of het met JAXB lukt ipv de rss component
+
+//@XmlElementWrapper(name = "feedentries")
 @XmlRootElement(name = "feedentry")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FeedEntry

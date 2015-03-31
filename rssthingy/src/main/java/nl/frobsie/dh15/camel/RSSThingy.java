@@ -7,20 +7,27 @@ import org.apache.camel.impl.SimpleRegistry;
 
 import nl.frobsie.dh15.camel.PostgresBean;
 import nl.frobsie.dh15.camel.FeedBean;
-import nl.frobsie.dh15.camel.FeedEntry;
 
 public class RSSThingy {
 
+    /** GMAIL */
+    private static String GMAIL_USER = "";
+    private static String GMAIL_PASSWORD = "";
+    private static String GMAIL_FROM = "";
+    private static String GMAIL_TO = "";
+
+    /** RSS */
     public static String URL_RSS = "http://phys.org/rss-feed/space-news/astronomy/";
     public static String FILE_RSS = "src/main/resources/feed.xml";
+    public static String FILE_XSL = "src/main/resources/template.xsl";
 
+    /** Queries */
     public static String SQL_INSERT = "insert into public.feedentryqueue (title, link, description, pubdate) values (:#title, :#link, :#description, :#pubdate)";
-    //public static String SQL_GET = "select * from feedentryqueue where processed=false";
+    public static String SQL_GET_UNPROCESSED = "select * from feedentryqueue where processed=false";
     public static String SQL_GET_PROCESSED = "select id, title, link, description, pubdate, processed, externalid from feedentryqueue where processed=true";
     public static String SQL_GET_MAIL = "select * from email";
-    public static String SQL_PROCESS = "update feedentryqueue set processed = true, externalid = :#externalid where id = :#id";
-
-    public static String MSG_MAIL = "Email versturen?";
+    public static String SQL_UPDATE_PROCESSED = "update feedentryqueue set processed = true where id = :#id";
+    public static String SQL_UPDATE_EXTERNALID = "update feedentryqueue set externalid = :#externalid where id = :#id";
 
     public static void main(String args[]) throws Exception {
 
@@ -30,7 +37,7 @@ public class RSSThingy {
         FeedBean feedBean = new FeedBean();
 
         // Voeg de custom beans to aan de registry
-        registry.put("postgres", postgresBean.getDataSource());
+        registry.put("jdbc/postgres", postgresBean.getDataSource());
         registry.put("feedBean", feedBean);
 
         // Bouw de camelContext op met de registry
@@ -41,57 +48,80 @@ public class RSSThingy {
             public void configure() {
 
                 /*
-                 * EIP's :
+                 * Gebruikte EIP's :
                  * - Pipes and Filters
+                 * - Message Translator (beans -> geen afhankelijkheid camel)
                  * - Multicast
-                 *
-                 * TODO
-                 * recipient list
                  */
 
                 /**
                  * Route 1
-                 * Haalt de feed per aanwezig item op van opgegeven url en zet deze om
-                 * naar records in de database. Let op dat hier niet marshal().rss()
-                 * uitgevoerd wordt, omdat we de daadwerkelijke ROME SyncFeed objecten
+                 * Haalt de feed per aanwezig item op van opgegeven url. 
+                 * Let op dat hier niet marshal().rss() uitgevoerd wordt, 
+                 * omdat we de daadwerkelijke ROME SyncFeed objecten
                  * willen hebben en niet de XML als string.
                  */
                 from("rss:file:" + FILE_RSS + "?splitEntries=true&consumer.delay=100"). // LOKAAL VANWEGE GARE VERBINDING
                 //from("rss:" + URL_RSS + "?splitEntries=true&consumer.delay=250").
-                    to("bean:feedBean?method=convert").
-                    multicast().
-                    to("direct:insert", "direct:unprocessed");
+                    to("direct:rssResults");
 
                 /**
                  * Route 2
-                 * Insert de zojuist geconverteerde items
-                 * in de database.
+                 * Converteren van de rss results naar een format
+                 * wat de SQL component snapt en deze inserten.
                  */
-                from("direct:insert").
-                    to("sql:" + SQL_INSERT + "?dataSource=postgres");
+                from("direct:rssResults").
+                    to("bean:feedBean?method=convert").
+                    to("sql:" + SQL_INSERT + "?dataSource=jdbc/postgres");
 
                 /**
                  * Route 3
                  * Verwerkt elk record in de feedentryqueue tabel 
                  * zodat het externalid (a.d.h.v. de link) gevuld wordt.
                  */
-                from("direct:unprocessed").
+                from("sql:" + SQL_GET_UNPROCESSED + "?dataSource=jdbc/postgres").
                     to("bean:feedBean?method=processEntry").
-                    to("sql:" + SQL_PROCESS + "?dataSource=postgres");
-
+                    multicast().
+                        to("direct:updateProcessed", "direct:updateExternalId");
+                    
                 /**
                  * Route 4
+                 * Update processed boolean in database.
+                 */
+                from("direct:updateProcessed").
+                    to("sql:" + SQL_UPDATE_PROCESSED + "?dataSource=jdbc/postgres");
+
+                /**
+                 * Route 5
+                 * Update externalid in database.
+                 */
+                from("direct:updateExternalId").
+                    to("sql:" + SQL_UPDATE_EXTERNALID + "?dataSource=jdbc/postgres");
+
+                // TODO 
+                // kopieerslag van queue tabel naar iets anders
+                // zodat het niet compleet nutteloos is ;-)
+
+                /**
+                 * Route 5
                  * Converteer de processed results in de database
                  * naar een XML bestand. Leg daar een XSL bestand overheen voor
                  * styling en verstuur het naar alle emailadresssen die
                  * in de database bekend zijn.
                  */
-                // from("sql:" + SQL_GET_PROCESSED + "?dataSource=postgres&outputClass=nl.frobsie.dh15.camel.FeedEntry").
-                //     //convertBodyTo(String.class).
-                //     to("xslt:file:src/main/resources/template.xsl");
-                    //to("stream:out");
-                    //.to("smtps://<google user name>@smtp.gmail.com?password=<passwd>&to=<email address>&from=camellover@gmail.com");
+                from("rss:file:" + FILE_RSS + "?splitEntries=false").
+                    marshal().rss().
+                    to("xslt:file:" + FILE_XSL).
+                    to("log:nl.frobsie.dh15.camel.RSSThingy").
+                    to("direct:xsltResult");
 
+                /**
+                 * Route 6
+                 * Mail de geconverteerde rssresults
+                 */
+                from("direct:xsltResult").
+                    setHeader("subject", simple("RSS Thingy")).
+                    to("smtps://" + GMAIL_USER + "@smtp.gmail.com?password=" + GMAIL_PASSWORD + "&to=" + GMAIL_TO + "&from=" + GMAIL_FROM);
             }
         });
 

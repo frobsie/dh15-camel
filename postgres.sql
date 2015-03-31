@@ -9,10 +9,3 @@ CREATE TABLE public.feedentryqueue
   externalid character varying(255) DEFAULT NULL,
   CONSTRAINT feedentryqueue_pkey PRIMARY KEY (id)
 );
-
-CREATE TABLE public.email
-(
-  id serial NOT NULL,
-  address character varying,
-  CONSTRAINT email_pkey PRIMARY KEY (id)
-);

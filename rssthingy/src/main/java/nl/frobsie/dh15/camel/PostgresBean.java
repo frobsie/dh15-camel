@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
 
 /**
  * TODO
- * Dit ding kan echt zo veel beter
+ * - Class opzet verbeteren
  */
 public class PostgresBean
 {
@@ -34,8 +34,8 @@ public class PostgresBean
         dataSource.setPassword("postgres");
         dataSource.setUrl("jdbc:postgresql://192.168.3.60:5432/dh15");
 
-        //truncate();
-        //resetSequence();
+        truncate();
+        resetSequence();
     }
 
     /**
